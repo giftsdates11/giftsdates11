@@ -2993,18 +2993,18 @@ async def create_checkout(req: CheckoutReq, user=Depends(get_current_user)):
         pkg_name = pkg["name"]; amount = int(round(pkg["amount"] * 100)); mode = "payment"
         metadata = {"user_id": user["id"], "package_id": req.package_id, "type": "coins", "coins": str(pkg["coins"] + pkg["bonus"])}
     try:
-        _price_data = {"currency": "usd", "product_data": {"name": pkg_name}, "unit_amount": amount}
+        # Tax code for Stripe-managed payments: SaaS for premium/VIP, general-digital for coins
+        _tax_code = "txcd_10103001" if metadata.get("type") in ("premium", "premium_lite", "vip") else "txcd_10000000"
+        _price_data = {"currency": "usd", "product_data": {"name": pkg_name, "tax_code": _tax_code}, "unit_amount": amount}
         _extra = {}
         if mode == "subscription":
             _price_data["recurring"] = {"interval": "month"}
             # carry metadata onto the subscription so recurring invoices can be attributed
             _extra["subscription_data"] = {"metadata": metadata}
-        session = stripe.checkout.Session.create(
+        _base = dict(
             line_items=[{"price_data": _price_data, "quantity": 1}],
             mode=mode,
-            # Omitting payment_method_types lets Stripe show every method enabled in the Dashboard for the buyer's country:
-            # all major cards worldwide, Apple Pay / Google Pay, Link, PayPal, Klarna, iDEAL, SEPA, Alipay, WeChat Pay, etc.
-            billing_address_collection="auto",
+            # Omitting payment_method_types lets Stripe show every method enabled in the Dashboard for the buyer's country.
             customer_email=user.get("email"),
             locale="auto",
             success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
@@ -3012,6 +3012,20 @@ async def create_checkout(req: CheckoutReq, user=Depends(get_current_user)):
             metadata=metadata,
             **_extra,
         )
+        if mode == "payment":
+            # Emergent-managed Stripe payments (SMP): Stripe handles tax calculation, collection,
+            # filing & remittance plus fraud/dispute handling. Fall back to Stripe Tax if ineligible.
+            try:
+                session = stripe.checkout.Session.create(**_base, managed_payments={"enabled": True})
+            except stripe.error.InvalidRequestError as e:
+                msg = (e.user_message or "").lower()
+                if "managed payments" in msg or "ineligible" in msg:
+                    session = stripe.checkout.Session.create(**_base, automatic_tax={"enabled": True}, billing_address_collection="required")
+                else:
+                    raise
+        else:
+            # Subscriptions bill the saved card monthly (SMP doesn't cover recurring billing)
+            session = stripe.checkout.Session.create(**_base, billing_address_collection="auto")
     except stripe.error.StripeError as e:
         raise HTTPException(500, f"Stripe error: {e.user_message or str(e)}")
     await db.payment_transactions.insert_one({
