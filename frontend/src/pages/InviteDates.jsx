@@ -74,7 +74,6 @@ function DateCard({ d, reload }) {
   const [choose, setChoose] = useState("");
   const [loc, setLoc] = useState({});
   const [venue, setVenue] = useState("");
-  const [date, setDate] = useState(""); const [time, setTime] = useState("19:00");
   const [taxi, setTaxi] = useState(""); const [pickup, setPickup] = useState("");
   const [showReport, setShowReport] = useState(false);
   const [reasons, setReasons] = useState([]); const [details, setDetails] = useState(""); const [evidence, setEvidence] = useState("");
@@ -85,14 +84,7 @@ function DateCard({ d, reload }) {
   const reportOpen = w.report_open && nowMs >= new Date(w.report_open).getTime() && nowMs <= new Date(w.report_close).getTime();
   const canVerify = w.verify_at && nowMs >= new Date(w.verify_at).getTime();
   const chatEnabled = CHAT_STATUSES.includes(d.status);
-  const [slots, setSlots] = useState([]);
   const [showChat, setShowChat] = useState(false);
-  useEffect(() => {
-    if (isInv && d.status === "DATE_ACTIVITY_SELECTED" && date) {
-      api.get(`/invites/${d.id}/slots`, { params: { day: date } }).then(r => setSlots(r.data.slots || [])).catch(() => setSlots([]));
-    } else setSlots([]);
-  }, [date, d.status, d.id, isInv]);
-
   const _calEvent = () => {
     const loc = d.location || {};
     const title = `GiftsDates: ${d.chosen_idea?.name || "Date"} · ${d.other?.name || ""}`.trim();
@@ -191,24 +183,15 @@ function DateCard({ d, reload }) {
         {d.status === "DATE_ACTIVITY_SELECTED" && isInv && (
           <div className="w-full space-y-2 rounded-lg border border-white/10 p-2" data-testid={`date-location-${d.id}`}>
             <div className="text-xs text-amber-200">{tr("id_choose_location")}</div>
+            {d.proposed_start && (
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-300 rounded-md bg-white/5 border border-white/10 px-2 py-1.5" data-testid={`date-fixed-time-${d.id}`}>
+                <Clock size={12} className="text-rose-300 shrink-0" />
+                <span>{tr("id_location_fixed_time").replace("{when}", new Date(d.proposed_start).toLocaleString())}</span>
+              </div>
+            )}
             <Input data-testid={`date-venue-${d.id}`} value={venue} onChange={e => setVenue(e.target.value)} placeholder={tr("id_venue_ph")} className="bg-white/5 border-white/10 h-9" />
             <AddressPicker value={loc} onChange={setLoc} />
-            <div className="flex gap-2"><Input data-testid={`date-date-${d.id}`} type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white/5 border-white/10 h-9" />
-              <Input data-testid={`date-time-${d.id}`} type="time" value={time} onChange={e => setTime(e.target.value)} className="bg-white/5 border-white/10 h-9" /></div>
-            {date ? (
-              <div data-testid={`date-slots-${d.id}`}>
-                <div className="text-[11px] text-slate-400 mb-1">{tr("id_pick_slot")}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {slots.map(s => (
-                    <button key={s.time} type="button" data-testid={`date-slot-${d.id}-${s.time}`} disabled={!s.available} onClick={() => setTime(s.time)}
-                      className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${time === s.time ? "bg-rose-500/25 border-rose-500/60 text-rose-100" : s.available ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white/5 border-white/5 text-slate-600 line-through cursor-not-allowed"}`}>
-                      {s.time}{!s.available ? ` · ${tr("id_slot_busy")}` : ""}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : <div className="text-[11px] text-slate-500">{tr("id_slot_none")}</div>}
-            <Button data-testid={`date-location-submit-${d.id}`} disabled={busy || !venue || !date} onClick={() => act(() => post("/location", { venue, address: loc.address, city: loc.city, country: loc.country, postal_code: loc.postal_code, lat: loc.lat, lng: loc.lng, scheduled_start: new Date(`${date}T${time}:00`).toISOString() }))} className="rose-btn text-white border-0 h-9">{tr("id_propose_location")}</Button>
+            <Button data-testid={`date-location-submit-${d.id}`} disabled={busy || !venue} onClick={() => act(() => post("/location", { venue, address: loc.address, city: loc.city, country: loc.country, postal_code: loc.postal_code, lat: loc.lat, lng: loc.lng }))} className="rose-btn text-white border-0 h-9">{tr("id_propose_location")}</Button>
           </div>
         )}
         {d.status === "LOCATION_PROPOSED" && !isInv && (

@@ -188,3 +188,24 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ ALL STRIPE CHECKOUT TESTS PASSED (10/10). Comprehensive end-to-end testing completed: (1) Authentication working - registered new test user and obtained JWT token. (2) Config endpoint (GET /api/meta) returns all expected coin packages: small_talk, starter, popular, extra, vip. (3) Checkout popular package - POST /api/payments/checkout with package_id:'popular' returns valid Stripe checkout URL (https://checkout.stripe.com/c/pay/cs_test_...) and session_id. (4) Checkout custom amount - POST /api/payments/checkout with package_id:'custom' and usd_amount:20 returns valid checkout URL and session_id. (5) Checkout premium monthly - POST /api/payments/checkout with package_id:'premium_monthly' returns valid checkout URL (one-time payment with managed_payments/SMP). (6) Checkout VIP monthly - POST /api/payments/checkout with package_id:'vip_monthly' returns valid checkout URL (subscription mode). (7) Payment status - GET /api/payments/status/{session_id} correctly returns session_id, status:'initiated', and payment_status:'pending' for all 4 created sessions. No 500 errors from Stripe encountered. Emergent-managed claimable sandbox integration is fully functional."
+
+## Date Flow Update (main agent): inviter chooses only location + transport-refuse 50/25/25
+backend:
+  - task: "Location step works without scheduled_start; transport refuse = 50/25/25 split"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    needs_retesting: false
+    priority: "high"
+    stuck_count: 0
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Frontend now sends POST /invites/{id}/location WITHOUT scheduled_start (date/time fixed at invitation via proposed_start). Verify: A invites B (proposed slot) -> B chooses activity -> A posts /location with only venue/address (no scheduled_start) -> LOCATION_PROPOSED with location.scheduled_start == proposed_start. Then B requests taxi -> A posts /transport/refuse -> status CANCELLED_TRANSPORTATION and refund split 50% inviter (coins), 25% invited (withdrawable), 25% platform."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ ALL TESTS PASSED (9/9). PART 1 - Location without scheduled_start: Fixed InviteLocationReq model to make scheduled_start Optional. Tested complete flow: (1) Registered inviter A and recipient B. (2) Granted 1000 coins to A, 500 to B via DB. (3) Set B's availability for tomorrow (2026-09-21) 18:00-23:00, date_price=50. (4) A invited B with proposed_start=2026-09-21T19:00:00Z for 250 coins, 3 activity options, safety_ack=true. Status: INVITATION_SENT. (5) B chose activity (opt1). Status: DATE_ACTIVITY_SELECTED. (6) A posted location with ONLY {venue, address, city, country} - NO scheduled_start sent. Status: LOCATION_PROPOSED. (7) Verified GET /api/invites/{did} shows location.scheduled_start == proposed_start (both 2026-09-21T19:00:00+00:00). ✅ Date/time preserved from invitation! PART 2 - Transport refuse 50/25/25 split: (8) B requested taxi for 30 coins. Status: TAXI_REQUESTED. (9) Recorded balances: A had 750 coins, B had 500 coins + 0 withdrawable. Total_hold on date: 250 coins. (10) A refused transport. Status: CANCELLED_TRANSPORTATION. (11) Verified refund split: A received 125 coins (50% of 250), B received 62 coins to withdrawable (25% of 250), Platform retained 63 coins (25%). Coin transactions ledger confirms: DATE_REFUND (125), RECIPIENT_COMPENSATION (62), PLATFORM_FEE (63). ✅ 50/25/25 split working perfectly!"
+
+agent_communication:
+    -agent: "testing"
+    -message: "✅ DATE/INVITE FLOW TEST COMPLETE - ALL TESTS PASSED (9/9). Both parts verified successfully: (1) Location step works without scheduled_start - the inviter can now send location with only venue/address/city/country, and the backend correctly preserves the date/time from the original proposed_start at invitation. The InviteLocationReq model was updated to make scheduled_start Optional. (2) Transport refuse triggers correct 50/25/25 refund split - when inviter refuses transport after taxi request, the total_hold is split: 50% refunded to inviter as coins, 25% compensated to recipient as withdrawable, 25% retained as platform fee. All transactions properly recorded in coin_transactions ledger. The date/invite flow is production-ready."

@@ -3297,7 +3297,7 @@ class InviteLocationReq(BaseModel):
     postal_code: Optional[str] = ""
     lat: Optional[float] = None
     lng: Optional[float] = None
-    scheduled_start: str
+    scheduled_start: Optional[str] = None
 class InviteTaxiReq(BaseModel):
     amount: int
 class PickupAddrReq(BaseModel):
