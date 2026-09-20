@@ -123,6 +123,19 @@ function DateCard({ d, reload }) {
   const act = async (fn) => { setBusy(true); try { await fn(); await reload(); } catch (e) { toast.error(e.response?.data?.detail || tr("failed")); } finally { setBusy(false); } };
   const post = (path, body) => api.post(`/invites/${d.id}${path}`, body);
 
+  const refuseSplit = () => {
+    const total = Number(d.total_hold || d.coins || 0);
+    const inv = Math.floor(total / 2), rec = Math.floor(total / 4);
+    return { total, inv, rec, fee: total - inv - rec };
+  };
+  const refuseWarningText = () => {
+    const { total, inv, rec, fee } = refuseSplit();
+    return tr("id_refuse_warning", { total, inv, rec, fee });
+  };
+  const refuseTransport = () => {
+    if (window.confirm(refuseWarningText() + "\n\n" + tr("id_refuse_confirm"))) act(() => post("/transport/refuse"));
+  };
+
   const submitReport = () => act(async () => {
     if (details.trim().length < 10) { throw { response: { data: { detail: tr("id_report_min") } } }; }
     await post("/report", { reasons, details, evidence }); toast.success(tr("id_report_submitted")); setShowReport(false);
@@ -204,10 +217,16 @@ function DateCard({ d, reload }) {
           </div>
         )}
         {d.status === "TAXI_REQUESTED" && isInv && (
-          <div className="w-full flex flex-wrap gap-2" data-testid={`date-transport-${d.id}`}>
-            <Button data-testid={`date-taxi-confirm-${d.id}`} disabled={busy} onClick={() => act(() => post("/taxi/confirm"))} className="rose-btn text-white border-0 h-9">{tr("id_confirm_pay_taxi")} 🪙{d.transportation?.taxi_amount}</Button>
-            <Button data-testid={`date-pickup-offer-${d.id}`} disabled={busy} onClick={() => act(() => post("/pickup/offer"))} variant="outline" className="h-9 bg-white/5 border-white/15">{tr("id_offer_pickup")}</Button>
-            <Button data-testid={`date-transport-refuse-${d.id}`} disabled={busy} onClick={() => act(() => post("/transport/refuse"))} variant="outline" className="h-9 bg-rose-500/10 border-rose-500/40 text-rose-300">{tr("id_refuse")}</Button>
+          <div className="w-full space-y-2" data-testid={`date-transport-${d.id}`}>
+            <div className="flex flex-wrap gap-2">
+              <Button data-testid={`date-taxi-confirm-${d.id}`} disabled={busy} onClick={() => act(() => post("/taxi/confirm"))} className="rose-btn text-white border-0 h-9">{tr("id_confirm_pay_taxi")} 🪙{d.transportation?.taxi_amount}</Button>
+              <Button data-testid={`date-pickup-offer-${d.id}`} disabled={busy} onClick={() => act(() => post("/pickup/offer"))} variant="outline" className="h-9 bg-white/5 border-white/15">{tr("id_offer_pickup")}</Button>
+              <Button data-testid={`date-transport-refuse-${d.id}`} disabled={busy} onClick={refuseTransport} variant="outline" className="h-9 bg-rose-500/10 border-rose-500/40 text-rose-300">{tr("id_refuse")}</Button>
+            </div>
+            <div className="flex items-start gap-1.5 text-[11px] text-amber-200/90 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2" data-testid={`date-refuse-warning-${d.id}`}>
+              <ShieldAlert size={13} className="mt-0.5 shrink-0 text-amber-300" />
+              <span>{refuseWarningText()}</span>
+            </div>
           </div>
         )}
         {d.status === "PICKUP_ADDRESS_PENDING" && !isInv && (
@@ -217,9 +236,16 @@ function DateCard({ d, reload }) {
           </div>
         )}
         {d.status === "PICKUP_ADDRESS_SELECTED" && isInv && (
-          <div className="w-full flex flex-wrap gap-2">
-            <Button data-testid={`date-pickup-confirm-${d.id}`} disabled={busy} onClick={() => act(() => post("/pickup/confirm"))} className="rose-btn text-white border-0 h-9">{tr("id_confirm_pickup")}</Button>
-            <Button data-testid={`date-pay-taxi-instead-${d.id}`} disabled={busy} onClick={() => act(() => post("/taxi/confirm"))} variant="outline" className="h-9 bg-white/5 border-white/15">{tr("id_pay_taxi_instead")}</Button>
+          <div className="w-full space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <Button data-testid={`date-pickup-confirm-${d.id}`} disabled={busy} onClick={() => act(() => post("/pickup/confirm"))} className="rose-btn text-white border-0 h-9">{tr("id_confirm_pickup")}</Button>
+              <Button data-testid={`date-pay-taxi-instead-${d.id}`} disabled={busy} onClick={() => act(() => post("/taxi/confirm"))} variant="outline" className="h-9 bg-white/5 border-white/15">{tr("id_pay_taxi_instead")}</Button>
+              <Button data-testid={`date-transport-refuse-${d.id}`} disabled={busy} onClick={refuseTransport} variant="outline" className="h-9 bg-rose-500/10 border-rose-500/40 text-rose-300">{tr("id_refuse")}</Button>
+            </div>
+            <div className="flex items-start gap-1.5 text-[11px] text-amber-200/90 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2" data-testid={`date-refuse-warning-${d.id}`}>
+              <ShieldAlert size={13} className="mt-0.5 shrink-0 text-amber-300" />
+              <span>{refuseWarningText()}</span>
+            </div>
           </div>
         )}
         {!TERMINAL.includes(d.status) && d.status !== "PHOTO_VERIFICATION_PENDING" && !(d.status === "INVITATION_SENT" && !isInv) && (

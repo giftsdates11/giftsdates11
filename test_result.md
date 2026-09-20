@@ -209,3 +209,36 @@ backend:
 agent_communication:
     -agent: "testing"
     -message: "✅ DATE/INVITE FLOW TEST COMPLETE - ALL TESTS PASSED (9/9). Both parts verified successfully: (1) Location step works without scheduled_start - the inviter can now send location with only venue/address/city/country, and the backend correctly preserves the date/time from the original proposed_start at invitation. The InviteLocationReq model was updated to make scheduled_start Optional. (2) Transport refuse triggers correct 50/25/25 refund split - when inviter refuses transport after taxi request, the total_hold is split: 50% refunded to inviter as coins, 25% compensated to recipient as withdrawable, 25% retained as platform fee. All transactions properly recorded in coin_transactions ledger. The date/invite flow is production-ready."
+
+## Refuse Warning + Full Date Flow (main agent) - FRONTEND TEST REQUESTED BY USER
+frontend:
+  - task: "Inviter 50/25/25 refuse warning + full accept->location->taxi/pickup->refuse UI flow"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/InviteDates.jsx"
+    needs_retesting: false
+    stuck_count: 0
+    priority: "high"
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added id_refuse_warning (50/25/25 with computed coins) + id_refuse_confirm. Refuse button now shows amber warning box (data-testid date-refuse-warning-{id}) at TAXI_REQUESTED and PICKUP_ADDRESS_SELECTED, and a window.confirm before calling /transport/refuse. Location step now location-only (no date/time pickers). Please test full flow via UI with 2 accounts."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ ALL TESTS PASSED (6/6). Comprehensive end-to-end UI test completed successfully. Created two test users via API (inviter_1789864038@test.com / recipient_1789864038@test.com), granted 1000 coins to inviter, set recipient availability for 2026-09-21 with date_price=200. Full flow verified: (1) Created invitation via API with 250 coins, 3 activity options, scheduled for tomorrow 19:00 - Status: INVITATION_SENT. (2) User B logged in via UI, navigated to /dates, found incoming invitation, selected first activity option, clicked Confirm - Status: DATE_ACTIVITY_SELECTED. (3) User A logged in, navigated to /dates outgoing section, found location step. ✅ VERIFIED: NO date/time pickers present in location step. ✅ VERIFIED: Fixed time note (data-testid date-fixed-time-{id}) displayed with text 'Date & time (fixed at invitation): 9/21/2026, 7:00:00 PM. You choose only the location.' Filled venue 'La Bella Vista Restaurant' and address 'Carrer de Mallorca, 123', submitted - Status: LOCATION_PROPOSED. (4) User B entered taxi amount 30 coins, clicked Request taxi - Status: TAXI_REQUESTED. (5) User A navigated to transport step. ✅ VERIFIED: All three buttons present (Pay taxi, Offer pickup, Refuse). ✅ VERIFIED: Amber warning box (data-testid date-refuse-warning-{id}) displayed with exact text: 'Warning: refusing the taxi/pickup cancels the date. Of 🪙 250, the refund is: 50% to you (🪙 125), 25% to the invited person (🪙 62) as compensation, and 25% (🪙 63) is kept by the platform.' Warning correctly shows 50/25/25 split with computed coin amounts. (6) Clicked Refuse button. ✅ VERIFIED: Browser confirm() dialog appeared with message containing 50/25/25 split details: 'Warning: refusing the taxi/pickup cancels the date. Of 🪙 250, the refund is: 50% to you (🪙 125), 25% to the invited person (🪙 62) as compensation, and 25% (🪙 63) is kept by the platform. Cancel the date by refusing transport? A 50/25/25 refund split will be applied.' Dialog auto-accepted. ✅ VERIFIED: Date status changed to 'Cancelled' (CANCELLED_TRANSPORTATION). Toast notification displayed: 'Your date has been cancelled. The date was cancelled over transportation. Refund applied (50/25/25).' All UI elements working correctly with proper data-testids. The full date invitation flow with 50/25/25 refuse warning is production-ready."
+
+metadata:
+  run_ui: true
+  test_sequence: 4
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "main"
+    -message: "Run an automated browser test of the full date flow with two users. Register/login two accounts (inviter A + recipient B). B must set availability (a future day + time window) in Profile so A can invite. Flow to cover: (1) A invites B from B's public profile (Browse -> open B -> invite/date button) picking an available slot + 3 activity ideas + coins; if A lacks coins, note it. (2) B goes to Dates -> Invitations (incoming), picks one activity option and Confirms -> DATE_ACTIVITY_SELECTED. (3) A goes to Dates (outgoing), sees location step showing ONLY venue + address (NO date/time pickers) plus a read-only fixed date/time note (data-testid date-fixed-time-{id}); submit venue -> LOCATION_PROPOSED. (4) B requests a taxi fee (enter amount, Request taxi). (5) A sees transport step with Pay taxi / Offer pickup / Refuse buttons AND an amber 50/25/25 warning box (data-testid date-refuse-warning-{id}); verify the warning shows the split numbers. (6) Click Refuse -> a confirm dialog appears mentioning 50/25/25 -> accept it -> date becomes Cancelled. Report whether each step works and whether the refuse warning + confirm are shown correctly. If invite creation UI is hard to reach, seed via API using the same backend but drive the transport/refuse UI with the created invite."
+    -agent: "testing"
+    -message: "✅ FULL DATE INVITATION FLOW TEST COMPLETE - ALL TESTS PASSED (6/6). Verified complete end-to-end flow from invitation creation through activity selection, location proposal (without date/time pickers), taxi request, and transport refusal with 50/25/25 split warning. Key findings: (1) Location step correctly hides date/time pickers and shows only venue + address fields with read-only fixed time note. (2) Transport step displays all three action buttons (Pay taxi, Offer pickup, Refuse) as expected. (3) Amber warning box (data-testid date-refuse-warning-{id}) correctly displays 50/25/25 split with computed coin amounts (125/62/63 from 250 total). (4) Browser confirm() dialog appears when clicking Refuse, containing the same 50/25/25 split warning text. (5) After accepting dialog, date status changes to 'Cancelled' and appropriate toast notification is shown. (6) All data-testids are correctly implemented and functional. The feature is production-ready. No issues found."
