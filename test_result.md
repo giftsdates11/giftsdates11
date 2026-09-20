@@ -242,3 +242,32 @@ agent_communication:
     -message: "Run an automated browser test of the full date flow with two users. Register/login two accounts (inviter A + recipient B). B must set availability (a future day + time window) in Profile so A can invite. Flow to cover: (1) A invites B from B's public profile (Browse -> open B -> invite/date button) picking an available slot + 3 activity ideas + coins; if A lacks coins, note it. (2) B goes to Dates -> Invitations (incoming), picks one activity option and Confirms -> DATE_ACTIVITY_SELECTED. (3) A goes to Dates (outgoing), sees location step showing ONLY venue + address (NO date/time pickers) plus a read-only fixed date/time note (data-testid date-fixed-time-{id}); submit venue -> LOCATION_PROPOSED. (4) B requests a taxi fee (enter amount, Request taxi). (5) A sees transport step with Pay taxi / Offer pickup / Refuse buttons AND an amber 50/25/25 warning box (data-testid date-refuse-warning-{id}); verify the warning shows the split numbers. (6) Click Refuse -> a confirm dialog appears mentioning 50/25/25 -> accept it -> date becomes Cancelled. Report whether each step works and whether the refuse warning + confirm are shown correctly. If invite creation UI is hard to reach, seed via API using the same backend but drive the transport/refuse UI with the created invite."
     -agent: "testing"
     -message: "✅ FULL DATE INVITATION FLOW TEST COMPLETE - ALL TESTS PASSED (6/6). Verified complete end-to-end flow from invitation creation through activity selection, location proposal (without date/time pickers), taxi request, and transport refusal with 50/25/25 split warning. Key findings: (1) Location step correctly hides date/time pickers and shows only venue + address fields with read-only fixed time note. (2) Transport step displays all three action buttons (Pay taxi, Offer pickup, Refuse) as expected. (3) Amber warning box (data-testid date-refuse-warning-{id}) correctly displays 50/25/25 split with computed coin amounts (125/62/63 from 250 total). (4) Browser confirm() dialog appears when clicking Refuse, containing the same 50/25/25 split warning text. (5) After accepting dialog, date status changes to 'Cancelled' and appropriate toast notification is shown. (6) All data-testids are correctly implemented and functional. The feature is production-ready. No issues found."
+    -agent: "testing"
+    -message: "✅ GET /api/invites/cancelled ENDPOINT TEST COMPLETE - ALL TESTS PASSED (14/14). Comprehensive end-to-end test verified the new cancelled dates endpoint with correct refund calculations. Created two cancellation scenarios: (1) Transport refuse (CANCELLED_TRANSPORTATION): A invited B (250 coins), B chose activity, A posted location, B requested taxi, A refused → 50/25/25 split applied. (2) Recipient reject (CANCELLED): A invited B (200 coins), B rejected immediately → full refund to A. VERIFICATION: As inviter A, endpoint returned both dates with role='inviter', correct other.name, total_hold values, and refund_amount (125 for transport refuse = 50%, 200 for recipient reject = 100%). As recipient B, endpoint returned both dates with role='recipient', correct other.name, and refund_amount (62 for transport refuse = 25%, 0 for recipient reject). Route resolution confirmed - endpoint correctly resolves to /invites/cancelled (not treating 'cancelled' as date ID). All refund calculations accurate. The endpoint is production-ready."
+
+## Cancelled/Refused dates on Profile (main agent)
+backend:
+  - task: "GET /api/invites/cancelled returns user's cancelled/refused dates + refund_amount"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    needs_retesting: false
+    priority: "high"
+    stuck_count: 0
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New endpoint /api/invites/cancelled (declared before /invites/{did}) returns dates with status in CANCELLED/CANCELLED_TRANSPORTATION/REFUNDED for the current user, with refund_amount summed from that user's DATE_REFUND+RECIPIENT_COMPENSATION coin_transactions for the date. Verify for both inviter (gets 50% -> refund_amount) and recipient (gets 25% -> refund_amount) after a transport/refuse cancellation."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ ALL TESTS PASSED (14/14). Comprehensive end-to-end test of GET /api/invites/cancelled endpoint completed successfully. SETUP: Registered inviter A and recipient B, granted 1000 coins to A, set B's availability (2026-09-21, 18:00-23:00, 150 coins). SCENARIO 1 - Transport refuse (CANCELLED_TRANSPORTATION): Created date with A inviting B (250 coins, 3 activity options), B chose activity, A posted location (venue only, no scheduled_start), B requested taxi (30 coins), A refused transport → status CANCELLED_TRANSPORTATION with 50/25/25 split. SCENARIO 2 - Recipient reject (CANCELLED): A invited B again (200 coins), B rejected immediately → status CANCELLED with full refund to A. VERIFICATION AS INVITER A: GET /api/invites/cancelled returned 200 with total=2. Date 1 (transport refuse): role='inviter', other.name='Bob Recipient', total_hold=250, refund_amount=125 (50% of 250), status='CANCELLED_TRANSPORTATION'. Date 2 (recipient reject): role='inviter', other.name='Bob Recipient', total_hold=200, refund_amount=200 (100% of 200), status='CANCELLED'. VERIFICATION AS RECIPIENT B: GET /api/invites/cancelled returned 200 with total=2. Date 1 (transport refuse): role='recipient', other.name='Alice Inviter', refund_amount=62 (25% compensation), status='CANCELLED_TRANSPORTATION'. Date 2 (recipient reject): role='recipient', other.name='Alice Inviter', refund_amount=0 (no compensation for rejecting), status='CANCELLED'. ROUTE RESOLUTION: Confirmed route correctly resolves to /invites/cancelled endpoint (not treating 'cancelled' as date ID). All refund calculations accurate: 50% to inviter (125), 25% to recipient (62), 25% platform fee (63) for transport refuse; 100% refund (200) to inviter for recipient reject. The endpoint is production-ready."
+frontend:
+  - task: "Profile shows Cancelled & refused dates section"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/CancelledDates.jsx"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New CancelledDates component on Profile lists cancelled/refused dates with status chip, other person, coins and refund-to-you amount."

@@ -3615,6 +3615,28 @@ async def list_invites(user=Depends(get_current_user)):
         (outgoing if d["inviter_id"] == user["id"] else incoming).append(s)
     return {"incoming": incoming, "outgoing": outgoing}
 
+@api.get("/invites/cancelled")
+async def list_cancelled_invites(user=Depends(get_current_user)):
+    """All cancelled or refused dates for the current user, with their coin outcome."""
+    statuses = ["CANCELLED", "CANCELLED_TRANSPORTATION", "REFUNDED"]
+    docs = await db.dates.find(
+        {"$or": [{"inviter_id": user["id"]}, {"recipient_id": user["id"]}], "status": {"$in": statuses}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(300)
+    items = []
+    for d in docs:
+        other_id = d["recipient_id"] if d["inviter_id"] == user["id"] else d["inviter_id"]
+        s = _serialize(d, user["id"], await _mini(other_id))
+        # coins credited back to THIS user for this date (refund / compensation)
+        my_txns = await db.coin_transactions.find(
+            {"user_id": user["id"], "date_id": d["id"]}, {"_id": 0}
+        ).sort("created_at", -1).to_list(50)
+        s["refund_amount"] = sum(int(t.get("amount", 0) or 0) for t in my_txns if t.get("type") in ("DATE_REFUND", "RECIPIENT_COMPENSATION"))
+        s["refund_txns"] = my_txns
+        items.append(s)
+    return {"items": items, "total": len(items)}
+
+
 @api.get("/invites/{did}")
 async def get_invite(did: str, user=Depends(get_current_user)):
     d = await _get_party(did, user["id"])
