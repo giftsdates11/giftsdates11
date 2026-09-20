@@ -106,7 +106,7 @@ export default function DateBookingModal({ open, onOpenChange, target }) {
             <div><Label className="text-xs text-slate-400">{t("venue", lang)}</Label>
               <Input data-testid="date-venue-input" value={venue} onChange={e => setVenue(e.target.value)} placeholder="Le Bernardin" className="bg-white/5 border-white/10 mt-1" /></div>
             <div><Label className="text-xs text-slate-400">{t("address", lang)}</Label>
-              <div className="mt-1"><AddressPicker testid="date-address" value={loc} onChange={(l) => { setLoc({ ...loc, ...l }); if (l.city) setCity(l.city); if (!venue && l.venue) setVenue(l.venue); }} /></div></div>
+              <div className="mt-1"><AddressPicker testid="date-address" manualFields={false} value={loc} onChange={(l) => { setLoc({ ...loc, ...l }); if (l.city) setCity(l.city); if (!venue && l.venue) setVenue(l.venue); }} /></div></div>
             <div className="grid grid-cols-3 gap-2">
               <div><Label className="text-xs text-slate-400">{t("city", lang)}</Label>
                 <Input data-testid="date-city-input" value={city} onChange={e => setCity(e.target.value)} className="bg-white/5 border-white/10 mt-1" /></div>
